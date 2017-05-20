@@ -1,0 +1,122 @@
+非对称加密算法需要两个密钥：公开密钥（publickey）和私有密钥（privatekey）。
+公开密钥与私有密钥是一对，如果用公开密钥对数据进行加密，只有用对应的私有密钥才能解密；
+如果用私有密钥对数据进行加密，那么只有用对应的公开密钥才能解密。
+因为加密和解密使用的是两个不同的密钥，所以这种算法叫作非对称加密算法。
+
+
+
+使用场景
+
+
+PHP 为客户端(Android，iOS)编写API，对数据进行解密。
+创建私钥、公钥
+[php] view plain copy
+openssl genrsa -out rsa_private_key.pem 1024  
+//生成原始 RSA私钥文件  
+openssl pkcs8 -topk8 -inform PEM -in rsa_private_key.pem -outform PEM -nocrypt -out private_key.pem  
+//将原始 RSA私钥转换为 pkcs8格式  
+openssl rsa -in rsa_private_key.pem -pubout -out rsa_public_key.pem  
+//生成RSA公钥  
+//我们将私钥rsa_private_key.pem用在服务器端，公钥发放给android跟ios等前端。  
+
+
+
+
+服务端类库
+
+
+[php] view plain copy
+class Rsa {      
+    private static $PRIVATE_KEY = '-----BEGIN RSA PRIVATE KEY-----MIICXgIBAAKBgQCoZZ8iUBprOIc0kGckr5ax6/Fd9IKKMc/XHayKEAvqpS0oz0b1ojEkpkdZBk0OWNhp73YNV+YLKBwwxOwb3u3hl8nBLoG/RilEbBMdCf55cUzNsfn/XF5CiLr/aci/OHuTe6ULvXs280T5M+nUh3iKdiT6z9XrFbH69C+xFoNInwIDAQABAoGAe+ape7msdo+VC5vkCB4ZprePVC3/jmawIfr3ZG4CFpeJ7qjz8O9xcSHXBS2ZrKC6Otex6Idv/213sHpzrt4L7+rSrgMOauWNjSVjr4T4Z168uvsnNocn+3GWfzbBPQj3PhjE64R/MkWDvuq2UK945WYtqFaC6LT1mJAXhjxqpiECQQDYGWYbCsUgQS0LnDzReyotkb9Eyr5UGlI8Nzn3PvwwkIS3N3yUsm2t3UokOw02DlhkC4f1aT097fM1w0FruSNNAkEAx31taitIGwgJg+yPmvwTs8AENm0wxi/V6loEXPBPxX2R4NjSG+ExYzA7/daDq//McKsX0EcYcsFN0E3HwSANmwJBAJUXGOHpUU1Kiihrd25TWissVdjBRATEUB4pP/2738QlwNqjFnmEjLUaak+KyjeUOBl19ywymkUCyPw7pQQMLDUCQQC84DKSDPyuK0PnFjk5QmXdEHZsmaFOY8gjpKrw286La8KMonz8TJCYGvkR8uKkHQMRwcxANLAfJopoKNxyK8j1AkEAwcY3EHeKe4i3FhCjGSqAGAzFFBS1jzTNZxw/cxMMCbfxFH4WvhowqoC1iAKDyZ7HF7V+RcxcfuhoBJi/3+ImEg==-----END RSA PRIVATE KEY-----';      
+    private static $PUBLIC_KEY = '-----BEGIN PUBLIC KEY-----MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCoZZ8iUBprOIc0kGckr5ax6/Fd9IKKMc/XHayKEAvqpS0oz0b1ojEkpkdZBk0OWNhp73YNV+YLKBwwxOwb3u3hl8nBLoG/RilEbBMdCf55cUzNsfn/XF5CiLr/aci/OHuTe6ULvXs280T5M+nUh3iKdiT6z9XrFbH69C+xFoNInwIDAQAB-----END PUBLIC KEY-----';     
+  
+    /**      
+     * 获取私钥      
+     * @return bool|resource      
+     */      
+    private static function getPrivateKey()   
+    {          
+        $privKey = self::$PRIVATE_KEY;          
+        return openssl_pkey_get_private($privKey);      
+    }      
+  
+    /**      
+     * 获取公钥      
+     * @return bool|resource      
+     */      
+    private static function getPublicKey()  
+    {          
+        $publicKey = self::$PUBLIC_KEY;          
+        return openssl_pkey_get_public($publicKey);      
+    }      
+  
+    /**      
+     * 私钥加密      
+     * @param string $data      
+     * @return null|string      
+     */      
+    public static function privEncrypt($data = '')      
+    {          
+        if (!is_string($data)) {              
+            return null;         
+        }          
+        return openssl_private_encrypt($data,$encrypted,self::getPrivateKey()) ? base64_encode($encrypted) : null;      
+    }      
+  
+    /**      
+     * 公钥加密      
+     * @param string $data      
+     * @return null|string      
+     */      
+    public static function publicEncrypt($data = '')     
+    {          
+        if (!is_string($data)) {              
+            return null;          
+        }          
+        return openssl_public_encrypt($data,$encrypted,self::getPublicKey()) ? base64_encode($encrypted) : null;      
+    }      
+  
+    /**      
+     * 私钥解密      
+     * @param string $encrypted      
+     * @return null      
+     */      
+    public static function privDecrypt($encrypted = '')      
+    {          
+        if (!is_string($encrypted)) {              
+            return null;          
+        }          
+        return (openssl_private_decrypt(base64_decode($encrypted), $decrypted, self::getPrivateKey())) ? $decrypted : null;      
+    }      
+  
+    /**      
+     * 公钥解密      
+     * @param string $encrypted      
+     * @return null      
+     */      
+    public static function publicDecrypt($encrypted = '')      
+    {          
+        if (!is_string($encrypted)) {              
+            return null;          
+        }          
+    return (openssl_public_decrypt(base64_decode($encrypted), $decrypted, self::getPublicKey())) ? $decrypted : null;      
+    }  
+}  
+
+服务端使用
+[php] view plain copy
+require_once "Rsa.php";  
+$rsa = new Rsa();  
+$data['name'] = 'Tom';  
+$data['age']  = '20';  
+$privEncrypt = $rsa->privEncrypt(json_encode($data));  
+echo '私钥加密后:'.$privEncrypt.'<br>';  
+  
+$publicDecrypt = $rsa->publicDecrypt($privEncrypt);  
+echo '公钥解密后:'.$publicDecrypt.'<br>';  
+  
+$publicEncrypt = $rsa->publicEncrypt(json_encode($data));  
+echo '公钥加密后:'.$publicEncrypt.'<br>';  
+  
+$privDecrypt = $rsa->privDecrypt($publicEncrypt);  
+echo '私钥解密后:'.$privDecrypt.'<br>';  
